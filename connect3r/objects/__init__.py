@@ -1,6 +1,3 @@
-from dataclasses import dataclass
+import connect3r.objects.SSHClient as SSHClient
 
-
-@dataclass
-class IP:
-    rep: str
+from connect3r.objects.data_classes import IP as IP
