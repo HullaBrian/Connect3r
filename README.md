@@ -13,12 +13,11 @@ To setup the docker container used for testing purposes:
         Exporting environment variables
         ```
 2. To initiate an SSH connection with the docker container, run:
-   1. 
-      ```commandline
+      ```
       ssh ssh_user@<IP OF DOCKER CONTAINER>
       ```
-   2. Accept the host key
-   3. When prompted for the password, enter "password"
+   - Accept the host key
+   - When prompted for the password, enter "password"
 
 - If you want to change the username and/or password of the docker container:
   - Change ```RUN useradd -p $(openssl passwd -1 password) ssh_user``` in Dockerfile to:
