@@ -12,12 +12,8 @@ then :
   exit
 fi
 
-echo "Decomposing docker container"
-sudo docker compose down --volumes
+echo "Deleting any existing docker container..."
 sudo docker rm -f connect3r_ssh
-
-echo "Composing docker container"
-sudo docker compose up
 
 echo "Constructing docker container"
 sudo docker build -t tagged_connect3r_ssh .
