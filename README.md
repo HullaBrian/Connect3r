@@ -8,8 +8,8 @@ To setup the docker container used for testing purposes:
         ```
         Test SSH Server given ip: 172.17.0.2
         Test SSH Server exposed on ports:
-        22/tcp -> 0.0.0.0:49158
-        22/tcp -> :::49158
+        22/tcp -> 0.0.0.0:12345
+        22/tcp -> :::12345
         Exporting environment variables
         ```
 2. To initiate an SSH connection with the docker container, run:
@@ -23,7 +23,7 @@ To setup the docker container used for testing purposes:
   - By default, the variables used by the docker container are:
     - username: "ssh_user"
     - password: "password"
-    - port: "49158"
+    - port: "12345"
   - Username and/or password:
     - Change ```RUN useradd -p $(openssl passwd -1 password) ssh_user``` in Dockerfile to ```RUN useradd -p $(openssl passwd -1 <password>) <username>``` 
     - Also, change the lines corresponding to username and password in "*build-container.sh*" so that unitests work:
@@ -34,5 +34,5 @@ To setup the docker container used for testing purposes:
     - When sshing into the container, make sure to update the username and ip in your command:
         - ```ssh <username>@<ip>```
   - Port number:
-    - In "*build-container.sh*", go to ```printf "DOCKER_IP=%s\nDOCKER_USERNAME=%s\nDOCKER_PASSWORD=%s\nDOCKER_PORT=49158" "${IP}" "${USERNAME}" "${PASSWORD}" > .env```, and change the DOCKER_PORT to your desired port number"
-    - Also, in "*build-container.sh*", go to ```docker run -d -P -p 49158:22 --name connect3r_ssh tagged_connect3r_ssh```, and change the 49158 to your desired port
+    - In "*build-container.sh*", go to ```printf "DOCKER_IP=%s\nDOCKER_USERNAME=%s\nDOCKER_PASSWORD=%s\nDOCKER_PORT=49158" "${IP}" "${USERNAME}" "${PASSWORD}" > .env```, and change the DOCKER_PORT to your desired port number
+    - Also, in "*build-container.sh*", go to ```docker run -d -P -p 12345:22 --name connect3r_ssh tagged_connect3r_ssh```, and change the 12345 to your desired port
