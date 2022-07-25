@@ -11,6 +11,8 @@ then :
   echo "Please ensure that docker is running"
   exit
 fi
+systemctl start docker
+# 18136 needs to be running
 
 echo "Deleting any existing docker container..."
 sudo docker rm -f connect3r_ssh

@@ -14,3 +14,6 @@ class ConnectionTimeoutException(Exception):
 class AuthenticationException(Exception):
     pass
 
+
+class SSHException(Exception):
+    pass
