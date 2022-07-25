@@ -14,5 +14,4 @@ logger.info("found docker password to be: " + PASSWORD)
 PORT: str = os.getenv("DOCKER_PORT")
 logger.info("found docker port to be: " + PORT)
 
-client = SSHClient("127.0.0.1", USERNAME, PASSWORD, port=int(PORT))
-
+client = SSHClient("127.0.0.1", USERNAME, PASSWORD)
