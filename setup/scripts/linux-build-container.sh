@@ -1,5 +1,9 @@
 #!/bin/bash
 
+DOCKER_PATH=$"$(python get_docker_path.py 2>&1)"
+cd "$DOCKER_PATH" || exit
+echo "Currently in directory: $PWD"
+
 if [ "$EUID" -ne 0 ]
   then echo "Please run with super-user privileges"
   exit

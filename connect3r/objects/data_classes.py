@@ -5,13 +5,16 @@ from dataclasses import dataclass
 class IP:
     rep: str
 
+    def __str__(self):
+        return self.rep
+
 
 @dataclass
 class Host:
     ip: str | IP
     mac_address: str
     key_cache: str
-    source_port: int
+    port: int
     username: str
     password: str
     ssh_version: str
@@ -22,4 +25,4 @@ class Server:
     ip: str | IP
     mac_address: str
     key_cache: str
-    destination_port: int
+    port: int
