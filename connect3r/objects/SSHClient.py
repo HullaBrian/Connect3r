@@ -15,9 +15,8 @@ from scapy.layers.inet import IP
 from scapy.layers.inet import TCP
 from scapy.all import TCPSession
 from scapy.all import sr1
-from scapy.all import send
 from scapy.all import Packet
-from scapy.all import sniff
+from scapy.all import sr
 
 
 class SSHClient(socket.socket):
@@ -45,7 +44,6 @@ class SSHClient(socket.socket):
         self.server: Server = Server(ip, "", "", 22)
 
         if self._has_ssh():
-            sniff(count=0, stop_filter=lambda packet: packet.hasLayer(TCP) and packet.dst == self.server.ip)
             pass
         else:
             exception_str: str = "Could not verify that device has ssh connections available!"
@@ -83,4 +81,4 @@ class SSHClient(socket.socket):
 
         # ack
         ack = TCP(sport=self.host.port, dport=self.server.port, flags='A', seq=synack.ack, ack=synack.seq + 1)
-        send(ip / ack)
+        response = sr(syn / ack)
