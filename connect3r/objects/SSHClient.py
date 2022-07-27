@@ -68,12 +68,15 @@ class SSHClient(socket.socket):
         ]
         self.server: Server = Server(ip, "", "", 22, "", supported_server_host_key_algorithms)
 
+        """
         if self._has_ssh():
+            # do something...
             pass
         else:
             exception_str: str = "Could not verify that device has ssh connections available!"
             logger.critical(exception_str)
             raise SSHException(exception_str)
+        """
 
     def _has_ssh(self) -> bool:
         logger.info("verifying that device has ssh")
@@ -99,7 +102,6 @@ class SSHClient(socket.socket):
         return False
 
     def connect(self, **kwargs):
-        logger.info("verifying that device has ssh")
         logger.debug("Source ip: " + str(self.host.ip))
         logger.debug("Source port: " + str(self.host.port))
         logger.debug("Destination ip: " + str(self.server.ip))
@@ -108,49 +110,23 @@ class SSHClient(socket.socket):
             super().connect((str(self.server.ip), self.server.port))
 
             # Send SSH version
-            super().send(b"SSH-2.0-" + bytes(self.host.ssh_version.split("p1")[0]) + bytearray.fromhex("0d0a"))
+            super().send(b"SSH-2.0-" + self.host.ssh_version.split("p1")[0].encode() + bytearray.fromhex("0d0a"))
             # Receive SSH Version
-            response = super().recv(1024)
+            logger.warning("waiting for server ssh version")
+            self.server.ssh_version = super().recv(1024).decode("utf-8")
+            logger.success("received server ssh version as " + self.server.ssh_version.replace("\n", ""))
 
             # Initiate key exchange
+            logger.warning("initiating key exchange...")
             self._kex()
+            logger.success("key exchange successful!")
 
             super().close()
         except OSError as exception:
             logger.critical("connection refused. Is the device on? Error: " + str(exception))
-        except Exception as exception:
-            logger.critical("Error during connection: " + str(exception))
 
     def _kex(self):
-        kex_packet = KEX_PACKET(
-            packet_length=0,
-            padding_length=0,
-            message_code_kex_init=0,
-            cookie="",
-            kex_algorithms_length=0,
-            kex_algorithms_string_truncated="",
-            server_host_key_algorithms_length=0,
-            server_host_key_algorithms_string="",
-            encryption_algorithms_client_to_server_length=0,
-            encryption_algorithms_client_to_server_string="",
-            encryption_algorithms_server_to_client_length=0,
-            encryption_algorithms_server_to_client_string="",
-            mac_algorithms_client_to_server_length=0,
-            mac_algorithms_client_to_server_string="",
-            mac_algorithms_server_to_client_length=0,
-            mac_algorithms_server_to_client_string="",
-            compression_algorithms_client_to_server_length=0,
-            compression_algorithms_client_to_server_string="",
-            compression_algorithms_server_to_client_length=0,
-            compression_algorithms_server_to_client_string="",
-            languages_client_to_server_length=0,
-            languages_client_to_server_string="",
-            languages_server_to_client_length=0,
-            languages_server_to_client_string="",
-            first_kex_packet_follows=0,
-            reserved="",
-            padding_string=""
-        )
+        """
         packet: bytes = bytearray.fromhex("00000105")  # 4
         packet += bytearray.fromhex("05")  # 1
         packet += bytearray.fromhex("14")  # 1
@@ -172,3 +148,41 @@ class SSHClient(socket.socket):
         packet += bytearray.fromhex("0000001A")  # 4
         packet += b"none,zlib@openssh.com,zlib"  # 26
         packet += bytearray.fromhex("00" * 18)  # footer/padding  # 9
+        super().sendall(packet)
+        return
+        """
+
+        kex_packet: bytes = KEX_PACKET(
+            kex_algorithm=",".join(self.host.supported_kex_algorithms)
+            , server_host_key_algorithms=",".join(self.server.supported_server_host_key_algorithms)
+            , encryption_algorithms_client_to_server=",".join(self.host.supported_encryption_algorithms)
+            , encryption_algorithms_server_to_client=",".join(self.server.supported_server_host_key_algorithms)
+            , mac_algorithms_client_to_server=",".join(self.host.supported_mac_algorithms)
+            , mac_algorithms_server_to_client=",".join(self.host.supported_mac_algorithms)
+            , compression_algorithms_client_to_server=",".join(self.host.supported_mac_algorithms)
+            , compression_algorithms_server_to_client=",".join(self.host.supported_mac_algorithms)
+        ).representation
+        super().sendall(kex_packet)
+        """
+        packet: bytes = bytearray.fromhex("00000105")  # 4
+        packet += bytearray.fromhex("05")  # 1
+        packet += bytearray.fromhex("14")  # 1
+        packet += bytearray.fromhex("9388d38ee73c2a5dc6808fd2dcd2ebd7")  # 16
+        packet += bytearray.fromhex("00000053")  # 4  20
+        packet += b"curve25519-sha256,curve25519-sha256@libssh.org,diffie-hellman-group-exchange-sha256"  # 17
+        packet += bytearray.fromhex("0000000C")  # 4
+        packet += b"rsa-sha2-512"  # 12
+        packet += bytearray.fromhex("0000000A")  # 4
+        packet += b"aes256-ctr"  # 10
+        packet += bytearray.fromhex("0000000A")  # 4
+        packet += b"aes256-ctr"  # 10
+        packet += bytearray.fromhex("0000000D")  # 4
+        packet += b"hmac-sha2-512"  # 13
+        packet += bytearray.fromhex("0000000D")  # 4
+        packet += b"hmac-sha2-512"  # 13
+        packet += bytearray.fromhex("0000001A")  # 4
+        packet += b"none,zlib@openssh.com,zlib"  # 26
+        packet += bytearray.fromhex("0000001A")  # 4
+        packet += b"none,zlib@openssh.com,zlib"  # 26
+        packet += bytearray.fromhex("00" * 18)  # footer/padding  # 9
+        """

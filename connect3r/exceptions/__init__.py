@@ -1,8 +1,3 @@
-import sys
-import os
-sys.path.append(os.path.dirname(__file__))
-
-
 class ConnectionRefusedException(Exception):
     pass
 
@@ -16,4 +11,20 @@ class AuthenticationException(Exception):
 
 
 class SSHException(Exception):
+    pass
+
+
+class PacketOverflowException(Exception):
+    pass
+
+
+class MissingPacketFieldException(Exception):
+    pass
+
+
+class MalformedPacketException(Exception):
+    pass
+
+
+class MaxPacketSizeExceededException(Exception):
     pass
