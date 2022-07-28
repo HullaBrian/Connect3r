@@ -91,7 +91,7 @@ class SSHClient(socket.socket):
         try:
             super().connect((str(self.server.ip), self.server.port))
             logger.debug("connected to device!")
-            response = super().recv(1024)
+            response = super().recv(32768)
             logger.info("received: " + str(response))
             logger.debug("closing connection")
             super().close()
@@ -109,31 +109,35 @@ class SSHClient(socket.socket):
         logger.debug("Source port: " + str(self.host.port))
         logger.debug("Destination ip: " + str(self.server.ip))
         logger.debug("Destination port: " + str(self.server.port))
+
         try:
             super().connect((str(self.server.ip), self.server.port))
             logger.success("connected to device!")
 
-            # Send SSH version
-            super().send(b"SSH-2.0-" + self.host.ssh_version.split("p1")[0].encode() + bytearray.fromhex("0d0a"))
-            # Receive SSH Version
-            logger.warning("waiting for server ssh version")
-            self.server.ssh_version = super().recv(2048).decode("utf-8")
-            logger.success("received server ssh version as " + self.server.ssh_version.replace("\n", ""))
+            # Exchange ssh versions
+            logger.warning("exchanging ssh versions")
+            self._exchange_ssh_versions()
+            logger.success("successfully exchanged ssh version")
 
             # Initiate key exchange
             logger.warning("initiating key exchange...")
-            self._kex()
+            self._kex_init()
             logger.success("key exchange successful!")
-
-            logger.warning("reading server key exchange packet...")
-            self.packet_bytes = [bytes([b]) for b in super().recv(2048)]
-            server_key_exchange_init: KEX_PACKET_DECODE = self._decode_kex_packet()
 
             super().close()
         except OSError as exception:
             logger.critical("connection refused. Is the device on? Error: " + str(exception))
 
-    def _kex(self):
+    def _exchange_ssh_versions(self):
+        # Send SSH version
+        super().send(b"SSH-2.0-" + self.host.ssh_version.split("p1")[0].encode() + bytearray.fromhex("0d0a"))
+        logger.debug(f"sent client ssh version as SSH-2.0-{self.host.ssh_version.split('p1')[0]}")
+        # Receive SSH Version
+        logger.warning("waiting for server ssh version")
+        self.server.ssh_version = super().recv(32768).decode("utf-8")
+        logger.debug("received server ssh version as " + self.server.ssh_version.replace("\n", ""))
+
+    def _kex_init(self):
         kex_packet: bytes = KEX_PACKET(
             kex_algorithm=",".join(self.host.supported_kex_algorithms)
             , server_host_key_algorithms=",".join(self.server.supported_server_host_key_algorithms)
@@ -145,6 +149,12 @@ class SSHClient(socket.socket):
             , compression_algorithms_server_to_client=",".join(self.host.supported_mac_algorithms)
         ).representation
         super().sendall(kex_packet)
+
+        logger.info("sent client key exchange packet")
+
+        logger.warning("reading server key exchange packet...")
+        self.packet_bytes = [bytes([b]) for b in super().recv(32768)]
+        server_key_exchange_init: KEX_PACKET_DECODE = self._decode_kex_packet()
 
     def _decode_kex_packet(self) -> KEX_PACKET_DECODE:
         decoded_packet: KEX_PACKET_DECODE = KEX_PACKET_DECODE(
@@ -211,7 +221,6 @@ class SSHClient(socket.socket):
         decoded_packet.padding_string = self._pop_range(int.from_bytes(decoded_packet.padding_length, "big"))
 
         decoded_packet.build_packet()
-        print(decoded_packet.encryption_algorithms_client_to_server_string)
         return decoded_packet
 
     def _pop_range(self, end_index: int) -> bytes:

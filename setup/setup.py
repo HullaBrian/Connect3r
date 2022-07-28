@@ -15,4 +15,4 @@ if platform == "unknown":
 for script in scripts:
     if script.startswith(platform):
         logger.info(f"running '{os.path.join(script_path, script)}' in command line")
-        subprocess.run(["./" + os.path.join(script_path, script)])
+        subprocess.run(["sudo", "sh", os.path.join(script_path, script)])

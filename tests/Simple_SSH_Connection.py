@@ -4,6 +4,7 @@ import os
 from loguru import logger
 import time
 
+
 logger.info("loading environment variables")
 load_dotenv(find_dotenv())
 IP: str = os.getenv("DOCKER_IP")
@@ -15,5 +16,5 @@ logger.info("found docker password to be: " + PASSWORD)
 PORT: str = os.getenv("DOCKER_PORT")
 logger.info("found docker port to be: " + PORT)
 
-client = SSHClient("192.168.1.101", USERNAME, PASSWORD)
+client = SSHClient("172.17.0.2", USERNAME, PASSWORD)
 client.connect()

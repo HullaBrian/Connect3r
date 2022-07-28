@@ -1,6 +1,6 @@
 #!/bin/bash
 
-DOCKER_PATH=$"$(python get_docker_path.py 2>&1)"
+DOCKER_PATH=$"$(python "scripts/get_docker_path.py" 2>&1)"
 cd "$DOCKER_PATH" || exit
 echo "Currently in directory: $PWD"
 

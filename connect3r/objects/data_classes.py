@@ -100,31 +100,31 @@ def _construct(self: object) -> bytes:
     if not isinstance(self, KEX_PACKET) and not isinstance(self, KEX_PACKET_DECODE):
         raise MalformedPacketException("Tried to construct Key Exchange Packet. ")
     logger.info("building packet")
-    self.representation += self.packet_length.to_bytes(4, 'big') if type(self.packet_length) is int else self.packet_length
-    self.representation += self.padding_length.to_bytes(1, 'big') if type(self.padding_length) is int else self.padding_length
-    self.representation += self.message_code_kex_init.to_bytes(1, 'big') if type(self.message_code_kex_init) is int else self.message_code_kex_init
+    self.representation += self.packet_length
+    self.representation += self.padding_length
+    self.representation += self.message_code_kex_init
     self.representation += self.cookie
-    self.representation += self.kex_algorithms_length.to_bytes(4, 'big') if type(self.kex_algorithms_length) is int else self.kex_algorithms_length
+    self.representation += self.kex_algorithms_length
     self.representation += self.kex_algorithms_string
-    self.representation += self.server_host_key_algorithms_length.to_bytes(4, 'big') if type(self.server_host_key_algorithms_length) is int else self.server_host_key_algorithms_length
+    self.representation += self.server_host_key_algorithms_length
     self.representation += self.server_host_key_algorithms_string
-    self.representation += self.encryption_algorithms_client_to_server_length.to_bytes(4, 'big') if type(self.encryption_algorithms_client_to_server_length) is int else self.encryption_algorithms_client_to_server_length
+    self.representation += self.encryption_algorithms_client_to_server_length
     self.representation += self.encryption_algorithms_client_to_server_string
-    self.representation += self.encryption_algorithms_server_to_client_length.to_bytes(4, 'big') if type(self.encryption_algorithms_server_to_client_length) is int else self.encryption_algorithms_server_to_client_length
+    self.representation += self.encryption_algorithms_server_to_client_length
     self.representation += self.encryption_algorithms_server_to_client_string
-    self.representation += self.mac_algorithms_client_to_server_length.to_bytes(4, 'big') if type(self.mac_algorithms_client_to_server_length) is int else self.mac_algorithms_client_to_server_length
+    self.representation += self.mac_algorithms_client_to_server_length
     self.representation += self.mac_algorithms_client_to_server_string
-    self.representation += self.mac_algorithms_server_to_client_length.to_bytes(4, 'big') if type(self.mac_algorithms_server_to_client_length) is int else self.mac_algorithms_server_to_client_length
+    self.representation += self.mac_algorithms_server_to_client_length
     self.representation += self.mac_algorithms_server_to_client_string
-    self.representation += self.compression_algorithms_client_to_server_length.to_bytes(4, 'big') if type(self.compression_algorithms_client_to_server_length) is int else self.compression_algorithms_client_to_server_length
+    self.representation += self.compression_algorithms_client_to_server_length
     self.representation += self.compression_algorithms_client_to_server_string
-    self.representation += self.compression_algorithms_server_to_client_length.to_bytes(4, 'big') if type(self.compression_algorithms_server_to_client_length) is int else self.compression_algorithms_server_to_client_length
+    self.representation += self.compression_algorithms_server_to_client_length
     self.representation += self.compression_algorithms_server_to_client_string
-    self.representation += self.languages_client_to_server_length.to_bytes(4, 'big') if type(self.languages_client_to_server_length) is int else self.languages_client_to_server_length
+    self.representation += self.languages_client_to_server_length
     self.representation += self.languages_client_to_server_string
-    self.representation += self.languages_server_to_client_length.to_bytes(4, 'big') if type(self.languages_server_to_client_length) is int else self.languages_server_to_client_length
+    self.representation += self.languages_server_to_client_length
     self.representation += self.languages_server_to_client_string
-    self.representation += self.first_kex_packet_follows.to_bytes(1, 'big') if type(self.first_kex_packet_follows) is int else self.first_kex_packet_follows
+    self.representation += self.first_kex_packet_follows
     self.representation += self.reserved
     self.representation += self.padding_string
     logger.success("built packet!")
@@ -216,13 +216,10 @@ class KEX_PACKET(object):
 
         logger.success("constructed client key exchange packet")
 
-        compute_packet_length_thread = Thread(target=self._compute_packet_length, args=())
-        compute_packet_length_thread.start()
-
         self._serialize_strings()
         logger.success("serialized packet entries")
 
-        compute_packet_length_thread.join()
+        self._compute_packet_length()
         logger.success("calculated packet length")
 
         _construct(self)
@@ -259,7 +256,7 @@ class KEX_PACKET(object):
         return self.cookie
 
     def _compute_packet_length(self):
-        total_length: int = 67 + 8  # Minimum number of bytes for payload
+        total_length: int = 75  # Minimum number of bytes for payload
         total_length += int.from_bytes(self.kex_algorithms_length, "big")
 
         total_length += int.from_bytes(self.encryption_algorithms_client_to_server_length, "big")
@@ -275,9 +272,10 @@ class KEX_PACKET(object):
         total_length += int.from_bytes(self.languages_server_to_client_length, "big")
 
         self.padding_length = 0
+        # TODO: ensure that padding_length is up to standard with the openssh RFC
         self.padding_string = bytearray.fromhex("00" * self.padding_length)
-
         total_length += self.padding_length
+        self.padding_length = num_to_bytes(self.padding_length, 1)
 
         self.packet_length = num_to_bytes(total_length, 4)
 
