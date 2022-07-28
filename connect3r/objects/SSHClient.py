@@ -1,5 +1,6 @@
 from connect3r.objects.data_classes import IP
 from connect3r.objects.data_classes import KEX_PACKET
+from connect3r.objects.data_classes import KEX_PACKET_DECODE
 from connect3r.objects.data_classes import Host
 from connect3r.objects.data_classes import Server
 
@@ -8,6 +9,7 @@ from connect3r.exceptions import *
 import socket
 from subprocess import check_output
 from subprocess import STDOUT
+import time
 from random import randint
 
 from loguru import logger
@@ -68,6 +70,7 @@ class SSHClient(socket.socket):
         ]
         self.server: Server = Server(ip, "", "", 22, "", supported_server_host_key_algorithms)
 
+        self.packet_bytes: list[bytes] = []
         """
         if self._has_ssh():
             # do something...
@@ -108,12 +111,13 @@ class SSHClient(socket.socket):
         logger.debug("Destination port: " + str(self.server.port))
         try:
             super().connect((str(self.server.ip), self.server.port))
+            logger.success("connected to device!")
 
             # Send SSH version
             super().send(b"SSH-2.0-" + self.host.ssh_version.split("p1")[0].encode() + bytearray.fromhex("0d0a"))
             # Receive SSH Version
             logger.warning("waiting for server ssh version")
-            self.server.ssh_version = super().recv(1024).decode("utf-8")
+            self.server.ssh_version = super().recv(2048).decode("utf-8")
             logger.success("received server ssh version as " + self.server.ssh_version.replace("\n", ""))
 
             # Initiate key exchange
@@ -121,37 +125,15 @@ class SSHClient(socket.socket):
             self._kex()
             logger.success("key exchange successful!")
 
+            logger.warning("reading server key exchange packet...")
+            self.packet_bytes = [bytes([b]) for b in super().recv(2048)]
+            server_key_exchange_init: KEX_PACKET_DECODE = self._decode_kex_packet()
+
             super().close()
         except OSError as exception:
             logger.critical("connection refused. Is the device on? Error: " + str(exception))
 
     def _kex(self):
-        """
-        packet: bytes = bytearray.fromhex("00000105")  # 4
-        packet += bytearray.fromhex("05")  # 1
-        packet += bytearray.fromhex("14")  # 1
-        packet += bytearray.fromhex("9388d38ee73c2a5dc6808fd2dcd2ebd7")  # 16
-        packet += bytearray.fromhex("00000053")  # 4  20
-        packet += b"curve25519-sha256,curve25519-sha256@libssh.org,diffie-hellman-group-exchange-sha256"  # 17
-        packet += bytearray.fromhex("0000000C")  # 4
-        packet += b"rsa-sha2-512"  # 12
-        packet += bytearray.fromhex("0000000A")  # 4
-        packet += b"aes256-ctr"  # 10
-        packet += bytearray.fromhex("0000000A")  # 4
-        packet += b"aes256-ctr"  # 10
-        packet += bytearray.fromhex("0000000D")  # 4
-        packet += b"hmac-sha2-512"  # 13
-        packet += bytearray.fromhex("0000000D")  # 4
-        packet += b"hmac-sha2-512"  # 13
-        packet += bytearray.fromhex("0000001A")  # 4
-        packet += b"none,zlib@openssh.com,zlib"  # 26
-        packet += bytearray.fromhex("0000001A")  # 4
-        packet += b"none,zlib@openssh.com,zlib"  # 26
-        packet += bytearray.fromhex("00" * 18)  # footer/padding  # 9
-        super().sendall(packet)
-        return
-        """
-
         kex_packet: bytes = KEX_PACKET(
             kex_algorithm=",".join(self.host.supported_kex_algorithms)
             , server_host_key_algorithms=",".join(self.server.supported_server_host_key_algorithms)
@@ -163,26 +145,80 @@ class SSHClient(socket.socket):
             , compression_algorithms_server_to_client=",".join(self.host.supported_mac_algorithms)
         ).representation
         super().sendall(kex_packet)
-        """
-        packet: bytes = bytearray.fromhex("00000105")  # 4
-        packet += bytearray.fromhex("05")  # 1
-        packet += bytearray.fromhex("14")  # 1
-        packet += bytearray.fromhex("9388d38ee73c2a5dc6808fd2dcd2ebd7")  # 16
-        packet += bytearray.fromhex("00000053")  # 4  20
-        packet += b"curve25519-sha256,curve25519-sha256@libssh.org,diffie-hellman-group-exchange-sha256"  # 17
-        packet += bytearray.fromhex("0000000C")  # 4
-        packet += b"rsa-sha2-512"  # 12
-        packet += bytearray.fromhex("0000000A")  # 4
-        packet += b"aes256-ctr"  # 10
-        packet += bytearray.fromhex("0000000A")  # 4
-        packet += b"aes256-ctr"  # 10
-        packet += bytearray.fromhex("0000000D")  # 4
-        packet += b"hmac-sha2-512"  # 13
-        packet += bytearray.fromhex("0000000D")  # 4
-        packet += b"hmac-sha2-512"  # 13
-        packet += bytearray.fromhex("0000001A")  # 4
-        packet += b"none,zlib@openssh.com,zlib"  # 26
-        packet += bytearray.fromhex("0000001A")  # 4
-        packet += b"none,zlib@openssh.com,zlib"  # 26
-        packet += bytearray.fromhex("00" * 18)  # footer/padding  # 9
-        """
+
+    def _decode_kex_packet(self) -> KEX_PACKET_DECODE:
+        decoded_packet: KEX_PACKET_DECODE = KEX_PACKET_DECODE(
+            b""
+            , b""
+            , b""
+            , b""
+            , b""
+            , b""
+            , b""
+            , b""
+            , b""
+            , b""
+            , b""
+            , b""
+            , b""
+            , b""
+            , b""
+            , b""
+            , b""
+            , b""
+            , b""
+            , b""
+            , b""
+            , b""
+            , b""
+            , b""
+            , b""
+            , b""
+            , b""
+            , b""
+        )
+
+        decoded_packet.packet_length = self._pop_range(4)
+        decoded_packet.padding_length = self._pop_range(1)
+        decoded_packet.message_code_kex_init = self._pop_range(1)
+        decoded_packet.cookie = self._pop_range(16)
+
+        decoded_packet.kex_algorithms_length = self._pop_range(4)
+        decoded_packet.kex_algorithms_string = self._pop_range(int.from_bytes(decoded_packet.kex_algorithms_length, "big"))
+
+        decoded_packet.server_host_key_algorithms_length = self._pop_range(4)
+        decoded_packet.server_host_key_algorithms_string = self._pop_range(int.from_bytes(decoded_packet.server_host_key_algorithms_length, "big"))
+
+        decoded_packet.encryption_algorithms_client_to_server_length = self._pop_range(4)
+        decoded_packet.encryption_algorithms_client_to_server_string = self._pop_range(int.from_bytes(decoded_packet.encryption_algorithms_client_to_server_length, "big"))
+        decoded_packet.encryption_algorithms_server_to_client_length = self._pop_range(4)
+        decoded_packet.encryption_algorithms_server_to_client_string = self._pop_range(int.from_bytes(decoded_packet.encryption_algorithms_server_to_client_length, "big"))
+
+        decoded_packet.compression_algorithms_client_to_server_length = self._pop_range(4)
+        decoded_packet.compression_algorithms_client_to_server_string = self._pop_range(int.from_bytes(decoded_packet.compression_algorithms_client_to_server_length, "big"))
+        decoded_packet.compression_algorithms_server_to_client_length = self._pop_range(4)
+        decoded_packet.compression_algorithms_server_to_client_string = self._pop_range(int.from_bytes(decoded_packet.compression_algorithms_server_to_client_length, "big"))
+
+        decoded_packet.languages_client_to_server_length = self._pop_range(4)
+        decoded_packet.languages_client_to_server_string = self._pop_range(int.from_bytes(decoded_packet.languages_client_to_server_length, "big"))
+        decoded_packet.languages_server_to_client_length = self._pop_range(4)
+        decoded_packet.languages_server_to_client_string = self._pop_range(int.from_bytes(decoded_packet.languages_server_to_client_length, "big"))
+
+        decoded_packet.first_kex_packet_follows = self._pop_range(1)
+
+        decoded_packet.reserved = self._pop_range(4)
+
+        decoded_packet.padding_string = self._pop_range(int.from_bytes(decoded_packet.padding_length, "big"))
+
+        decoded_packet.build_packet()
+        print(decoded_packet.encryption_algorithms_client_to_server_string)
+        return decoded_packet
+
+    def _pop_range(self, end_index: int) -> bytes:
+        out: list[bytes] = []
+
+        for byt in self.packet_bytes[:end_index]:
+            out.append(byt)
+            self.packet_bytes.remove(byt)
+
+        return b"".join(out)
