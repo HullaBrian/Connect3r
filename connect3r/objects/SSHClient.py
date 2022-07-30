@@ -1,10 +1,9 @@
 from connect3r.objects.data_classes import IP
-from connect3r.objects.data_classes import KEX_PACKET
-from connect3r.objects.data_classes import KEX_PACKET_DECODE
 from connect3r.objects.data_classes import Host
 from connect3r.objects.data_classes import Server
-
 from connect3r.exceptions import *
+from connect3r.objects.Packetizer import Packetizer
+from connect3r.templates import get_templates
 
 import socket
 from subprocess import check_output
@@ -13,6 +12,7 @@ import time
 from random import randint
 
 from loguru import logger
+import secrets  # self.cookie = bytearray.fromhex(secrets.token_hex(16))
 
 
 class SSHClient(socket.socket):
@@ -27,6 +27,7 @@ class SSHClient(socket.socket):
                  ):
         socket.socket.__init__(self, internet_address_family, socket_type, *args, **kwargs)
 
+        self.TEMPLATES = None
         source_ip: IP = IP(socket.gethostbyname(socket.gethostname()))
         ssh_version: str = check_output(
             ["ssh", "-V"]
@@ -71,15 +72,6 @@ class SSHClient(socket.socket):
         self.server: Server = Server(ip, "", "", 22, "", supported_server_host_key_algorithms)
 
         self.packet_bytes: list[bytes] = []
-        """
-        if self._has_ssh():
-            # do something...
-            pass
-        else:
-            exception_str: str = "Could not verify that device has ssh connections available!"
-            logger.critical(exception_str)
-            raise SSHException(exception_str)
-        """
 
     def _has_ssh(self) -> bool:
         logger.info("verifying that device has ssh")
@@ -110,6 +102,10 @@ class SSHClient(socket.socket):
         logger.debug("Destination ip: " + str(self.server.ip))
         logger.debug("Destination port: " + str(self.server.port))
 
+        logger.info("loading packet templates")
+        self.TEMPLATES = get_templates()
+        logger.success("loaded packet templates")
+
         try:
             super().connect((str(self.server.ip), self.server.port))
             logger.success("connected to device!")
@@ -138,96 +134,50 @@ class SSHClient(socket.socket):
         logger.debug("received server ssh version as " + self.server.ssh_version.replace("\n", ""))
 
     def _kex_init(self):
-        kex_packet: bytes = KEX_PACKET(
-            kex_algorithm=",".join(self.host.supported_kex_algorithms)
-            , server_host_key_algorithms=",".join(self.server.supported_server_host_key_algorithms)
-            , encryption_algorithms_client_to_server=",".join(self.host.supported_encryption_algorithms)
-            , encryption_algorithms_server_to_client=",".join(self.server.supported_server_host_key_algorithms)
-            , mac_algorithms_client_to_server=",".join(self.host.supported_mac_algorithms)
-            , mac_algorithms_server_to_client=",".join(self.host.supported_mac_algorithms)
-            , compression_algorithms_client_to_server=",".join(self.host.supported_mac_algorithms)
-            , compression_algorithms_server_to_client=",".join(self.host.supported_mac_algorithms)
-        ).representation
-        super().sendall(kex_packet)
+        kex_algs_string = ",".join(self.host.supported_kex_algorithms)
+        server_host_key_algs = ",".join(self.server.supported_server_host_key_algorithms)
+        encryption_algs = ",".join(self.host.supported_encryption_algorithms)
+        mac_algs = ",".join(self.host.supported_mac_algorithms)
+        compression_algs = ",".join(self.host.supported_compression_algorithms)
+        languages = ",".join([])
+
+        kex_packet = Packetizer(self.TEMPLATES["kex"], data={
+            "PACKET LENGTH": -1,
+            "PADDING LENGTH": 0,
+            "MESSAGE CODE KEX INIT": 20,
+            "COOKIE": bytearray.fromhex(secrets.token_hex(16)),
+            "KEX ALGORITHMS LENGTH": len(kex_algs_string),
+            "KEX ALGORITHMS STRING": kex_algs_string,
+            "SERVER HOST KEY ALGORITHMS LENGTH": len(server_host_key_algs),
+            "SERVER HOST KEY ALGORITHMS STRING": server_host_key_algs,
+            "ENCRYPTION ALGORITHMS CLIENT TO SERVER LENGTH": len(encryption_algs),
+            "ENCRYPTION ALGORITHMS CLIENT TO SERVER STRING": encryption_algs,
+            "ENCRYPTION ALGORITHMS SERVER TO CLIENT LENGTH": len(encryption_algs),
+            "ENCRYPTION ALGORITHMS SERVER TO CLIENT STRING": encryption_algs,
+            "MAC ALGORITHMS CLIENT TO SERVER LENGTH": len(mac_algs),
+            "MAC ALGORITHMS CLIENT TO SERVER STRING": mac_algs,
+            "MAC ALGORITHMS SERVER TO CLIENT LENGTH": len(mac_algs),
+            "MAC ALGORITHMS SERVER TO CLIENT STRING": mac_algs,
+            "COMPRESSION ALGORITHMS CLIENT TO SERVER LENGTH": len(compression_algs),
+            "COMPRESSION ALGORITHMS CLIENT TO SERVER STRING": compression_algs,
+            "COMPRESSION ALGORITHMS SERVER TO CLIENT LENGTH": len(compression_algs),
+            "COMPRESSION ALGORITHMS SERVER TO CLIENT STRING": compression_algs,
+            "LANGUAGES CLIENT TO SERVER LENGTH": len(languages),
+            "LANGUAGES CLIENT TO SERVER STRING": languages,
+            "LANGUAGES SERVER TO CLIENT LENGTH": len(languages),
+            "LANGUAGES SERVER TO CLIENT STRING": languages,
+            "FIRST KEX PACKET FOLLOWS": 0,
+            "RESERVED": 0,
+            "PADDING STRING": 0
+        })
+        super().sendall(kex_packet.encode_packet())
 
         logger.info("sent client key exchange packet")
 
         logger.warning("reading server key exchange packet...")
-        self.packet_bytes = [bytes([b]) for b in super().recv(32768)]
-        server_key_exchange_init: KEX_PACKET_DECODE = self._decode_kex_packet()
+        self.packet_bytes = super().recv(32768)
+        server_key_exchange_init: dict = self._decode_kex_packet()
 
-    def _decode_kex_packet(self) -> KEX_PACKET_DECODE:
-        decoded_packet: KEX_PACKET_DECODE = KEX_PACKET_DECODE(
-            b""
-            , b""
-            , b""
-            , b""
-            , b""
-            , b""
-            , b""
-            , b""
-            , b""
-            , b""
-            , b""
-            , b""
-            , b""
-            , b""
-            , b""
-            , b""
-            , b""
-            , b""
-            , b""
-            , b""
-            , b""
-            , b""
-            , b""
-            , b""
-            , b""
-            , b""
-            , b""
-            , b""
-        )
-
-        decoded_packet.packet_length = self._pop_range(4)
-        decoded_packet.padding_length = self._pop_range(1)
-        decoded_packet.message_code_kex_init = self._pop_range(1)
-        decoded_packet.cookie = self._pop_range(16)
-
-        decoded_packet.kex_algorithms_length = self._pop_range(4)
-        decoded_packet.kex_algorithms_string = self._pop_range(int.from_bytes(decoded_packet.kex_algorithms_length, "big"))
-
-        decoded_packet.server_host_key_algorithms_length = self._pop_range(4)
-        decoded_packet.server_host_key_algorithms_string = self._pop_range(int.from_bytes(decoded_packet.server_host_key_algorithms_length, "big"))
-
-        decoded_packet.encryption_algorithms_client_to_server_length = self._pop_range(4)
-        decoded_packet.encryption_algorithms_client_to_server_string = self._pop_range(int.from_bytes(decoded_packet.encryption_algorithms_client_to_server_length, "big"))
-        decoded_packet.encryption_algorithms_server_to_client_length = self._pop_range(4)
-        decoded_packet.encryption_algorithms_server_to_client_string = self._pop_range(int.from_bytes(decoded_packet.encryption_algorithms_server_to_client_length, "big"))
-
-        decoded_packet.compression_algorithms_client_to_server_length = self._pop_range(4)
-        decoded_packet.compression_algorithms_client_to_server_string = self._pop_range(int.from_bytes(decoded_packet.compression_algorithms_client_to_server_length, "big"))
-        decoded_packet.compression_algorithms_server_to_client_length = self._pop_range(4)
-        decoded_packet.compression_algorithms_server_to_client_string = self._pop_range(int.from_bytes(decoded_packet.compression_algorithms_server_to_client_length, "big"))
-
-        decoded_packet.languages_client_to_server_length = self._pop_range(4)
-        decoded_packet.languages_client_to_server_string = self._pop_range(int.from_bytes(decoded_packet.languages_client_to_server_length, "big"))
-        decoded_packet.languages_server_to_client_length = self._pop_range(4)
-        decoded_packet.languages_server_to_client_string = self._pop_range(int.from_bytes(decoded_packet.languages_server_to_client_length, "big"))
-
-        decoded_packet.first_kex_packet_follows = self._pop_range(1)
-
-        decoded_packet.reserved = self._pop_range(4)
-
-        decoded_packet.padding_string = self._pop_range(int.from_bytes(decoded_packet.padding_length, "big"))
-
-        decoded_packet.build_packet()
-        return decoded_packet
-
-    def _pop_range(self, end_index: int) -> bytes:
-        out: list[bytes] = []
-
-        for byt in self.packet_bytes[:end_index]:
-            out.append(byt)
-            self.packet_bytes.remove(byt)
-
-        return b"".join(out)
+    def _decode_kex_packet(self) -> dict:
+        packetizer = Packetizer(self.TEMPLATES["kex"], self.packet_bytes)
+        return packetizer.decode_packet()
