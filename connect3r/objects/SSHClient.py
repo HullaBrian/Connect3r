@@ -142,7 +142,7 @@ class SSHClient(socket.socket):
         languages = ",".join([])
 
         kex_packet = Packetizer(self.TEMPLATES["kex"], data={
-            "PACKET LENGTH": -1,
+            "PACKET LENGTH": 0,
             "PADDING LENGTH": 0,
             "MESSAGE CODE KEX INIT": 20,
             "COOKIE": bytearray.fromhex(secrets.token_hex(16)),
