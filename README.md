@@ -3,7 +3,7 @@ Connect3r is a a python package that aims to allow for quick, simple, and effect
 
 **Note**: Connect3r is not technically released yet. It is under development still, so there is no guarantee that it will work if you use it.
 
-I'm currently looking at using a 3rd party [openSSH implementation](https://github.com/openssh/openssh-portable) then using those C functions in the library to do the heavy lifting for me. Below is a link to using C functions in Python:
+I'm currently looking at using a 3rd party [openSSH implementation](https://github.com/openssh/openssh-portable) or [libSSH](https://api.libssh.org/stable/libssh_tutor_shell.html#opening_shell) then using those C functions in the library to do the heavy lifting for me. Below is a link to using C functions in Python:
 
 https://www.geeksforgeeks.org/how-to-call-a-c-function-in-python/
 # Setup for Docker Container
