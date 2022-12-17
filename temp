@@ -1,4 +1,6 @@
 import socket
+import select
+import sys
 
 class SSHClient:
     def __init__(self, host, port, username, password):
@@ -24,10 +26,31 @@ class SSHClient:
         if not response.startswith("ok"):
             raise Exception("Invalid login credentials: " + response)
 
-    def exec_command(self, command):
-        self.client.send(("exec " + command + "\r\n").encode())
-        response = self.client.recv(1024).decode()
-        return response
+    def interactive_shell(self):
+        # Enter interactive mode
+        self.client.send(b"shell\r\n")
+
+        # Set up the terminal for interactive input
+        sys.stdout.write("\x1b]0;Remote terminal\x07")
+        sys.stdout.flush()
+
+        # Main loop
+        while True:
+            # Wait for data from the server and the local stdin
+            r, w, e = select.select([self.client, sys.stdin], [], [])
+
+            # Data received from the server
+            if self.client in r:
+                data = self.client.recv(1024).decode()
+                if not data:
+                    break
+                sys.stdout.write(data)
+                sys.stdout.flush()
+
+            # Data received from stdin
+            if sys.stdin in r:
+                data = sys.stdin.readline()
+                self.client.send(data.encode())
 
     def close(self):
         self.client.close()
