@@ -1,0 +1,33 @@
+import socket
+
+class SSHClient:
+    def __init__(self, host, port, username, password):
+        self.host = host
+        self.port = port
+        self.username = username
+        self.password = password
+
+    def connect(self):
+        self.client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.client.connect((self.host, self.port))
+
+        # Perform the SSH handshake
+        self.client.send(b"SSH-2.0-client\r\n")
+        response = self.client.recv(1024).decode()
+        if not response.startswith("SSH-2.0-server"):
+            raise Exception("Unexpected SSH server response: " + response)
+
+        # Send the login credentials
+        self.client.send(("user " + self.username + "\r\n").encode())
+        self.client.send(("pass " + self.password + "\r\n").encode())
+        response = self.client.recv(1024).decode()
+        if not response.startswith("ok"):
+            raise Exception("Invalid login credentials: " + response)
+
+    def exec_command(self, command):
+        self.client.send(("exec " + command + "\r\n").encode())
+        response = self.client.recv(1024).decode()
+        return response
+
+    def close(self):
+        self.client.close()
